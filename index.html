@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Check-in | Rebeca e Ideltonio</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body {
+  margin: 0;
+  padding: 25px 15px;
+  background: #f7f4ef;
+  font-family: Arial, sans-serif;
+  color: #333;
+  text-align: center;
+}
+
+.container {
+  max-width: 440px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 18px;
+  box-shadow: 0 3px 15px #0001;
+}
+
+h2 { color: #766044; }
+
+input, button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 15px;
+  margin-top: 12px;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+input { border: 1px solid #ccc; }
+
+button {
+  background: #766044;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+#resultadoFrame {
+  width: 100%;
+  height: 135px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-top: 15px;
+}
+
+#leitor { margin-top: 20px; }
+
+#painel, #proximo { display: none; }
+
+.erro { color: #b3261e; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Check-in do Casamento</h2>
+<p>Rebeca e Ideltonio</p>
+
+<div id="login">
+  <p>Acesso exclusivo da recepção</p>
+
+  <input type="password" id="senha"
+    placeholder="Senha da equipe">
+
+  <button onclick="entrar()">Entrar</button>
+
+  <p id="mensagemLogin" class="erro"></p>
+</div>
+
+<div id="painel">
+
+  <p>Escaneie o QR Code do convidado.</p>
+
+  <div id="leitor"></div>
+
+  <button id="proximo" onclick="iniciarCamera()">
+    Ler próximo convidado
+  </button>
+
+  <iframe name="resultadoFrame"
+    id="resultadoFrame"
+    title="Resultado do check-in">
+  </iframe>
+
+</div>
+
+<form id="formulario"
+  method="POST"
+  target="resultadoFrame">
+
+  <input type="hidden" name="token" id="token">
+  <input type="hidden" name="senha" id="senhaForm">
+
+</form>
+
+</div>
+
+<script>
+
+// COLE A URL /exec DO SEU APPS SCRIPT
+const URL_APPS_SCRIPT = 'COLE_AQUI_SUA_URL_EXEC';
+
+let senhaEquipe = '';
+let scanner = null;
+let ocupado = false;
+
+function entrar() {
+  const senha = document.getElementById('senha').value;
+
+  if (!senha) {
+    document.getElementById('mensagemLogin').textContent =
+      'Digite a senha.';
+    return;
+  }
+
+  senhaEquipe = senha;
+
+  // Verifica a senha enviando um token inexistente.
+  // O servidor diferencia senha inválida de QR inválido.
+  document.getElementById('token').value = 'TESTE-LOGIN';
+  document.getElementById('senhaForm').value = senhaEquipe;
+
+  const frame = document.getElementById('resultadoFrame');
+
+  frame.onload = function() {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('painel').style.display = 'block';
+    iniciarCamera();
+  };
+
+  document.getElementById('formulario').action = URL_APPS_SCRIPT;
+  document.getElementById('formulario').submit();
+}
+
+async function iniciarCamera() {
+  document.getElementById('proximo').style.display = 'none';
+  ocupado = false;
+
+  if (scanner) {
+    try { await scanner.clear(); } catch(e) {}
+  }
+
+  document.getElementById('leitor').innerHTML = '';
+
+  scanner = new Html5Qrcode('leitor');
+
+  try {
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 230, height: 230 }
+      },
+      sucessoLeitura,
+      function() {}
+    );
+  } catch (erro) {
+    document.getElementById('leitor').innerHTML =
+      '<p class="erro">Não foi possível abrir a câmera. ' +
+      'Verifique a permissão do navegador.</p>';
+
+    document.getElementById('proximo').style.display = 'block';
+  }
+}
+
+async function sucessoLeitura(texto) {
+  if (ocupado) return;
+  ocupado = true;
+
+  try { await scanner.stop(); } catch(e) {}
+
+  let token = texto.trim();
+
+  try {
+    const url = new URL(texto);
+    token = url.searchParams.get('token') || texto.trim();
+  } catch(e) {}
+
+  document.getElementById('token').value = token;
+  document.getElementById('senhaForm').value = senhaEquipe;
+
+  document.getElementById('formulario').action = URL_APPS_SCRIPT;
+  document.getElementById('formulario').submit();
+
+  document.getElementById('proximo').style.display = 'block';
+}
+
+</script>
+
+</body>
+</html>
